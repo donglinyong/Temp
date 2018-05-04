@@ -1,0 +1,64 @@
+
+
+# 电销监控
+#!/usr/bin/env python
+# -*-coding:utf-8-*-
+
+import public_conn_mysql as public_conn_mysql
+import subprocess
+import time
+import datetime
+
+
+if __name__ == "__main__":
+	conndb = public_conn_mysql.ConnMysql("10.8.34.67","zxbi_rw","y-1stpp6RkpY","utf8")
+	result = 1
+	mobile_list = ["18126006281", "13662258451"]
+	v_hour = str(time.strftime("%H",time.localtime(time.time())))
+	v_week = int(datetime.datetime.strptime(str(time.strftime('%Y-%m-%d',time.localtime(time.time()))), "%Y-%m-%d").timetuple().tm_yday)
+	v_sql = """
+		Select Count(0) as cnt
+		  From (Select Type_Id, Type_Name, Caller, Count(0) As Cnt
+				  From Dm.Rpt_Tm_Call_List_New
+				 Where Static_Date = Current_Date
+				 Group By Type_Id, Type_Name, Caller) x
+		 Group By Type_Id, Type_Name;
+	"""
+	res = conndb.select(v_sql)
+	i = 0
+	"""监控每种类型是否只分发给一个人"""
+	for line in res:
+		v_cnt = line[0]
+		if v_cnt == 1:
+			result = 0
+		i += 1
+	"""监控名单类型分发结果是10种类型"""
+	if i != 8:
+		result = 0
+
+	if v_hour == "05":
+		if result == 0:
+			for x in range(2):
+				if v_week%2 == 0:
+					mobile = "18126006281"
+				else:
+					mobile = "13662258451"
+				v_cmd = "sh /appcom/script/alarm_interface/voice_monit.sh {} {}".format(mobile, "亲爱的,电销名单分发预警")
+				print u"第{}次拨打{}".format(str(x+1),mobile)
+				res2 = subprocess.call(v_cmd, shell=True)
+				print u"{}:电销名单分发异常".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+				if x == 0:
+					time.sleep(300)
+		else:
+			print ("{}:电销名单分发正常").format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+	else:
+		if result == 0:
+			mobileList = ["18126006281","13662258451"]
+			for mobile in mobileList:
+				v_cmd = "sh /appcom/script/alarm_interface/voice_monit.sh {} {}".format(mobile, "亲爱的,电销名单分发预警")
+				print u"拨打{}".format(mobile)
+				res2 = subprocess.call(v_cmd, shell=True)
+				print u"{}:电销名单分发异常".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+
+		else:
+			print u"{}:电销名单分发正常".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
